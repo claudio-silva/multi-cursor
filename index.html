@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Multi Cursor</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="brand">
+          <img class="brand-icon" src="/assets/logo.png" alt="" width="48" height="48" />
+          <div>
+            <h1>Multi Cursor</h1>
+            <p class="subtitle">Account &amp; Environment Manager</p>
+          </div>
+        </div>
+        <div id="status" class="status idle">Checking…</div>
+      </header>
+
+      <section class="panel">
+        <div class="panel-head">
+          <label for="env-select">Environment</label>
+          <div class="btn-row">
+            <button type="button" id="env-new" class="ghost">New</button>
+            <button type="button" id="env-rename" class="ghost">Rename</button>
+            <button type="button" id="env-delete" class="danger ghost">Delete</button>
+          </div>
+        </div>
+        <select id="env-select"></select>
+        <p id="env-disk" class="env-disk muted">Disk usage: —</p>
+      </section>
+
+      <section class="panel grow">
+        <div class="panel-head">
+          <span>Accounts</span>
+          <div class="btn-row">
+            <button type="button" id="acct-new" class="ghost">New</button>
+            <button type="button" id="acct-delete" class="danger ghost">Delete</button>
+          </div>
+        </div>
+        <ul id="account-list" class="account-list"></ul>
+      </section>
+
+      <p id="error" class="error hidden"></p>
+      <p id="success" class="success hidden"></p>
+      <p id="hint" class="hint hidden"></p>
+      <div id="progress" class="progress hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+        <div id="progress-label" class="progress-label"></div>
+        <div class="progress-track">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+      </div>
+
+      <footer class="footer">
+        <button type="button" id="launch" class="primary launch">Launch</button>
+      </footer>
+    </div>
+
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-card">
+        <h2 id="modal-title" class="modal-title"></h2>
+        <p id="modal-message" class="modal-message hidden"></p>
+        <input id="modal-input" class="modal-input hidden" type="text" autocomplete="off" />
+        <label id="modal-check-wrap" class="check hidden">
+          <input type="checkbox" id="modal-check" />
+          <span id="modal-check-label"></span>
+        </label>
+        <div class="modal-actions">
+          <button type="button" id="modal-cancel" class="ghost">Cancel</button>
+          <button type="button" id="modal-confirm" class="primary">OK</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
