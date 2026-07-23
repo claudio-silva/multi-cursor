@@ -411,6 +411,18 @@ button.primary.danger {
   white-space: pre-line;
 }
 
+.modal-link {
+  color: #7eb6ff;
+  font-size: 0.9rem;
+  word-break: break-all;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.modal-link:hover {
+  color: #a8ceff;
+}
+
 .modal-input {
   width: 100%;
   background: #101218;

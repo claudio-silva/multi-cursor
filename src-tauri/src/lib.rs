@@ -4,13 +4,12 @@ mod commands;
 mod copy_progress;
 mod cursor;
 mod paths;
+mod updates;
 mod window_frame;
 
-use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
-use tauri::AppHandle;
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::{AppHandle, Emitter};
 
-#[cfg(target_os = "macos")]
-use tauri::menu::MenuItem;
 #[cfg(not(target_os = "macos"))]
 use tauri::menu::AboutMetadata;
 
@@ -34,6 +33,14 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         app,
         "about",
         format!("About {}", about::APP_NAME),
+        true,
+        None::<&str>,
+    )?;
+
+    let check_updates_item = MenuItem::with_id(
+        app,
+        "check-for-updates",
+        "Check for Updates…",
         true,
         None::<&str>,
     )?;
@@ -67,6 +74,10 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         &[
             #[cfg(not(target_os = "macos"))]
             &about_item,
+            #[cfg(not(target_os = "macos"))]
+            &PredefinedMenuItem::separator(app)?,
+            #[cfg(not(target_os = "macos"))]
+            &check_updates_item,
         ],
     )?;
 
@@ -80,6 +91,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
                 true,
                 &[
                     &about_item,
+                    &check_updates_item,
                     &PredefinedMenuItem::separator(app)?,
                     &PredefinedMenuItem::services(app, None)?,
                     &PredefinedMenuItem::separator(app)?,
@@ -138,13 +150,16 @@ pub fn run() {
     tauri::Builder::default()
         .menu(build_menu)
         .on_menu_event(|app, event| {
-            if event.id() != "about" {
-                return;
+            match event.id().as_ref() {
+                "about" => {
+                    #[cfg(target_os = "macos")]
+                    about::show(&app.package_info().version.to_string());
+                }
+                "check-for-updates" => {
+                    let _ = app.emit("check-for-updates", ());
+                }
+                _ => {}
             }
-            #[cfg(target_os = "macos")]
-            about::show(&app.package_info().version.to_string());
-            #[cfg(not(target_os = "macos"))]
-            let _ = app;
         })
         .setup(|app| {
             window_frame::attach(app.handle());
@@ -164,6 +179,8 @@ pub fn run() {
             commands::quit_cursor_cmd,
             commands::force_quit_cursor_cmd,
             commands::is_cursor_running,
+            updates::check_for_updates,
+            updates::open_url,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

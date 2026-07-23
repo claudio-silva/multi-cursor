@@ -79,6 +79,7 @@ const els = {
   modal: document.querySelector("#modal") as HTMLElement,
   modalTitle: document.querySelector("#modal-title") as HTMLElement,
   modalMessage: document.querySelector("#modal-message") as HTMLElement,
+  modalLink: document.querySelector("#modal-link") as HTMLAnchorElement,
   modalInput: document.querySelector("#modal-input") as HTMLInputElement,
   modalCheckWrap: document.querySelector("#modal-check-wrap") as HTMLElement,
   modalCheck: document.querySelector("#modal-check") as HTMLInputElement,
@@ -86,6 +87,14 @@ const els = {
   modalCancel: document.querySelector("#modal-cancel") as HTMLButtonElement,
   modalConfirm: document.querySelector("#modal-confirm") as HTMLButtonElement,
 };
+
+interface UpdateCheckResult {
+  updateAvailable: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  releaseUrl: string;
+  message: string;
+}
 
 let state: AppState | null = null;
 let selectedEnvId: string | null = null;
@@ -153,6 +162,12 @@ function setProgress(percent: number | null, label?: string) {
   els.progress.setAttribute("aria-valuenow", String(p));
 }
 
+function hideModalLink() {
+  els.modalLink.classList.add("hidden");
+  els.modalLink.removeAttribute("href");
+  els.modalLink.textContent = "";
+}
+
 function closeModal(value: PromptResult) {
   // Read checkbox BEFORE clearing — askTextWithCheckbox needs this value.
   lastModalChecked = els.modalCheck.checked;
@@ -160,6 +175,8 @@ function closeModal(value: PromptResult) {
   els.modalInput.value = "";
   els.modalCheck.checked = false;
   els.modalCheckWrap.classList.add("hidden");
+  hideModalLink();
+  els.modalCancel.classList.remove("hidden");
   const resolve = modalResolver;
   modalResolver = null;
   // Defer past paint so “Restart” can hide the dialog before any IPC work.
@@ -203,9 +220,11 @@ function askText(title: string, initial = "", confirmLabel = "OK"): Promise<Prom
     els.modalTitle.textContent = title;
     els.modalMessage.classList.add("hidden");
     els.modalMessage.textContent = "";
+    hideModalLink();
     els.modalInput.classList.remove("hidden");
     els.modalInput.value = initial;
     els.modalCheckWrap.classList.add("hidden");
+    els.modalCancel.classList.remove("hidden");
     els.modalConfirm.textContent = confirmLabel;
     els.modalConfirm.classList.remove("danger");
     els.modal.classList.remove("hidden");
@@ -229,11 +248,13 @@ function askTextWithCheckbox(opts: TextPromptOptions): Promise<TextPromptResult 
     els.modalTitle.textContent = opts.title;
     els.modalMessage.classList.add("hidden");
     els.modalMessage.textContent = "";
+    hideModalLink();
     els.modalInput.classList.remove("hidden");
     els.modalInput.value = opts.initial ?? "";
     els.modalCheckWrap.classList.remove("hidden");
     els.modalCheckLabel.textContent = opts.checkboxLabel ?? "";
     els.modalCheck.checked = Boolean(opts.checkboxDefault);
+    els.modalCancel.classList.remove("hidden");
     els.modalConfirm.textContent = opts.confirmLabel ?? "OK";
     els.modalConfirm.classList.remove("danger");
     els.modal.classList.remove("hidden");
@@ -255,13 +276,55 @@ function askConfirm(
     els.modalTitle.textContent = title;
     els.modalMessage.textContent = message;
     els.modalMessage.classList.remove("hidden");
+    hideModalLink();
     els.modalInput.classList.add("hidden");
     els.modalCheckWrap.classList.add("hidden");
+    els.modalCancel.classList.remove("hidden");
     els.modalConfirm.textContent = confirmLabel;
     els.modalConfirm.classList.toggle("danger", danger);
     els.modal.classList.remove("hidden");
     requestAnimationFrame(() => els.modalConfirm.focus());
   });
+}
+
+function showMessageDialog(
+  title: string,
+  message: string,
+  linkUrl?: string | null,
+): Promise<void> {
+  return new Promise((resolve) => {
+    modalResolver = () => resolve();
+    els.modalTitle.textContent = title;
+    els.modalMessage.textContent = message;
+    els.modalMessage.classList.remove("hidden");
+    if (linkUrl) {
+      els.modalLink.href = linkUrl;
+      els.modalLink.textContent = linkUrl;
+      els.modalLink.classList.remove("hidden");
+    } else {
+      hideModalLink();
+    }
+    els.modalInput.classList.add("hidden");
+    els.modalCheckWrap.classList.add("hidden");
+    els.modalCancel.classList.add("hidden");
+    els.modalConfirm.textContent = "OK";
+    els.modalConfirm.classList.remove("danger");
+    els.modal.classList.remove("hidden");
+    requestAnimationFrame(() => els.modalConfirm.focus());
+  });
+}
+
+async function checkForUpdates() {
+  try {
+    const result = await call<UpdateCheckResult>("check_for_updates");
+    await showMessageDialog(
+      result.updateAvailable ? "Update available" : "Check for Updates",
+      result.message,
+      result.updateAvailable ? result.releaseUrl : null,
+    );
+  } catch {
+    // call() already surfaces the error in the UI
+  }
 }
 
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -687,6 +750,15 @@ window.addEventListener("DOMContentLoaded", () => {
     const value = els.modalInput.value.trim();
     closeModal(value || null);
   });
+  els.modalLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    const url = els.modalLink.getAttribute("href");
+    if (url && url !== "#") {
+      void invoke("open_url", { url }).catch((err) => {
+        showError(typeof err === "string" ? err : String(err));
+      });
+    }
+  });
   els.modalInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -701,6 +773,9 @@ window.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       closeModal(null);
     }
+  });
+  void listen("check-for-updates", () => {
+    void checkForUpdates();
   });
 
   els.envSelect.addEventListener("change", () => {
