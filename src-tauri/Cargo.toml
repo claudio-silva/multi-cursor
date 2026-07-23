@@ -20,5 +20,5 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 objc2 = "0.6.4"
-objc2-foundation = "0.3.2"
-objc2-app-kit = { version = "0.3.2", features = ["NSWindow", "NSScreen"] }
+objc2-foundation = { version = "0.3.2", features = ["NSAttributedString", "NSDictionary", "NSString", "NSURL", "NSRange"] }
+objc2-app-kit = { version = "0.3.2", features = ["NSWindow", "NSScreen", "NSApplication", "NSAttributedString"] }

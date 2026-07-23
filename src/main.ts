@@ -291,6 +291,14 @@ function accountDisplayName(account: Account): string {
   return account.name || account.email || "Account";
 }
 
+/** Label for confirm dialogs — includes email when it distinguishes the account. */
+function accountConfirmLabel(account: Account): string {
+  const name = account.name?.trim();
+  const email = account.email?.trim();
+  if (name && email && name !== email) return `${name} (${email})`;
+  return name || email || "Account";
+}
+
 function accountInitials(account: Account): string {
   if (account.pendingLogin) return "?";
   const source = accountDisplayName(account).trim();
@@ -514,6 +522,8 @@ function render() {
     showHint("Add an account to sign in, or Launch after selecting one.");
   } else if (!isCurrentEnv) {
     showHint("Launch to switch Cursor’s current environment.");
+  } else if (selectedAccountId !== config.active.accountId) {
+    showHint("Launch to switch Cursor’s current account.");
   } else if (Date.now() > flashUntil) {
     showHint(null);
   }
@@ -611,12 +621,12 @@ async function doLaunch() {
   if (needsRestart || (envChanging && !state?.cursorRunning)) {
     const account = state?.config.accounts.find((a) => a.id === selectedAccountId);
     const env = state?.config.environments.find((e) => e.id === selectedEnvId);
-    const label = account ? accountDisplayName(account) : "the selected account";
+    const label = account ? accountConfirmLabel(account) : "the selected account";
     const envName = env?.name ?? "the selected environment";
-    const title = envChanging ? "Switch environment?" : "Switch account?";
+    const title = envChanging ? "Switching environments" : "Switching accounts";
     const message = envChanging
-      ? `Make “${envName}” / ${label} current? Cursor will use this for Dock and Spotlight launches too.`
-      : `Quit Cursor and relaunch as ${label}?`;
+      ? `Activate the “${envName}” environment with the ${label} account?`
+      : `Activate the ${label} account?`;
     const ok = await askConfirm(
       title,
       state?.cursorRunning ? `${message}\n\nCursor will quit and reopen.` : message,
