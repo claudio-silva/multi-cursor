@@ -1,0 +1,15 @@
+[package]
+name = "multi-cursor-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared account and Cursor Agent auth logic for Multi Cursor"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+rusqlite = { workspace = true }

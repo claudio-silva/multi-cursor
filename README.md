@@ -167,6 +167,44 @@ When switching, Multi Cursor closes Cursor if necessary, activates the selected 
 - Copying an environment requires Cursor to quit because its data files may be locked.
 - **Cursor running** and **Cursor idle** report whether the Cursor IDE process is open.
 - Auth files under `~/.multi-cursor/accounts/` contain tokens. Never commit or share them.
+- After switching accounts, long-running `cursor-agent` sessions may keep the old login in memory until restarted. New CLI invocations pick up the selected account.
+
+## CLI (macOS and Linux)
+
+For headless machines (or scripting), build the CLI:
+
+```bash
+cargo build --release -p multi-cursor-cli
+./target/release/multi-cursor-cli --help
+```
+
+Commands:
+
+```bash
+multi-cursor-cli status
+multi-cursor-cli list
+multi-cursor-cli use <email|name|id>
+multi-cursor-cli capture [--name NAME]
+multi-cursor-cli export <account> [--out file|-]
+multi-cursor-cli import <file|->
+multi-cursor-cli remove <account>
+```
+
+On Linux the CLI writes `~/.config/cursor/auth.json` (and refreshes `~/.cursor/cli-config.json`). On macOS it updates the Keychain items used by `cursor-agent`, and also the IDE `state.vscdb` when present.
+
+Move an account between machines:
+
+```bash
+# source
+multi-cursor-cli export user@example.com --out - | ssh host 'multi-cursor-cli import -'
+# destination
+multi-cursor-cli use user@example.com
+cursor-agent about
+```
+
+Imported tokens are the same session as the source machine; a refresh on one side can invalidate the other.
+
+On macOS, `use`, `capture`, and removing the active account refuse to run while Cursor IDE is open — quit Cursor first so it cannot rewrite Keychain / `state.vscdb` mid-switch.
 
 ## How it works
 
@@ -176,18 +214,28 @@ Multi Cursor does not require flags or a launcher script. It makes Cursor's norm
 
 Each account is a snapshot of Cursor's `cursorAuth/*` login keys in `~/.multi-cursor/accounts/`. Switching writes those keys into the active environment's `state.vscdb`; it does not duplicate the whole database, which can be many GB.
 
+The same switch also updates the credentials that **Cursor Agent CLI** (`cursor-agent` / `agent`) uses:
+
+- macOS Keychain items `cursor-access-token` and `cursor-refresh-token` (account `cursor-user`)
+- identity fields in `~/.cursor/cli-config.json` (`authInfo`)
+
+Without this step, the IDE can show one account while `cursor-agent` stays on another.
+
 ```mermaid
 flowchart LR
   subgraph MC["Multi Cursor"]
     A1["Account A snapshot"]
     A2["Account B snapshot"]
   end
-  DB["Active environment state.vscdb<br/>cursorAuth/* only"]
+  DB["Active environment state.vscdb<br/>cursorAuth/*"]
+  KC["Keychain + cli-config.json<br/>cursor-agent auth"]
   A1 -->|"Launch"| DB
   A2 -->|"Launch"| DB
+  A1 -->|"Launch"| KC
+  A2 -->|"Launch"| KC
 ```
 
-Within one environment, history, settings, and extensions stay the same; only the signed-in identity changes.
+Within one environment, history, settings, and extensions stay the same; only the signed-in identity changes (IDE and Agent CLI together).
 
 ### Environments: full separation
 
@@ -248,6 +296,10 @@ Profiles separate editor preferences and extensions, but Cursor still has one si
 ### Why not use `--user-data-dir`?
 
 It is a valid way to isolate data, but every launch must use the right command. Multi Cursor activates the selected environment in Cursor's default locations, so Dock and Spotlight launches keep working.
+
+### Does account switching affect Cursor Agent CLI?
+
+Yes. Account and environment switches sync IDE `cursorAuth/*` tokens into the stores Cursor Agent uses (macOS Keychain, or `~/.config/cursor/auth.json` on Linux) and refresh `~/.cursor/cli-config.json`, so `cursor-agent about` matches the selected account. Restart any already-running `cursor-agent` process if it still reports the previous login. On macOS, quit Cursor IDE before switching from the CLI so the IDE cannot overwrite those credentials mid-switch.
 
 ### Does it duplicate all my Cursor data when I switch accounts?
 

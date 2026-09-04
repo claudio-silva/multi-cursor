@@ -1,5 +1,9 @@
+// Ensure the shared core library is linked for account / CLI auth helpers.
+use multi_cursor_core as _;
+
 mod about;
 mod auth;
+mod cli_auth;
 mod commands;
 mod copy_progress;
 mod cursor;

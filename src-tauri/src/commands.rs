@@ -6,6 +6,7 @@ use crate::auth::{
     has_login_tokens, load_snapshot, profile_name_from_snapshot, read_auth_keys, save_snapshot,
     write_auth_keys, AuthSnapshot,
 };
+use crate::cli_auth::{clear_cli_auth, sync_cli_auth_from_snapshot};
 use crate::copy_progress::{
     cleanup_partial_copy, copy_cursor_tree_with_progress, dir_size_bytes, emit_progress,
     purge_vscdb_bak_files, trash_paths_with_progress,
@@ -172,8 +173,11 @@ fn try_capture_pending(cfg: &mut AppConfig) -> Result<Vec<String>, String> {
                 apply_captured_identity(account, &email, &snap);
             }
             captured_emails.push(email);
-            cfg.active.env_id = Some(env_id);
-            cfg.active.account_id = Some(account_id);
+            cfg.active.env_id = Some(env_id.clone());
+            cfg.active.account_id = Some(account_id.clone());
+            // IDE login usually writes Keychain too; mirror snapshot so CLI
+            // identity metadata matches what Multi Cursor just captured.
+            let _ = sync_cli_auth_from_snapshot(&snap);
             continue;
         }
 
@@ -246,7 +250,32 @@ fn switch_environment(cfg: &mut AppConfig, env_id: &str) -> Result<(), String> {
         cfg.active.account_id = None;
     }
     save_config(cfg)?;
+
+    // Environment swap renames ~/.cursor, but Keychain is global. Re-sync CLI
+    // auth from the live IDE login (or clear it) so cursor-agent matches.
+    sync_cli_auth_for_active_env(cfg, env_id)?;
     Ok(())
+}
+
+fn sync_cli_auth_for_active_env(cfg: &AppConfig, env_id: &str) -> Result<(), String> {
+    if let Some(account_id) = cfg.active.account_id.as_deref() {
+        if let Some(account) = cfg.accounts.iter().find(|a| a.id == account_id) {
+            if account.env_id == env_id && !account.pending_login {
+                let snap = load_snapshot(env_id, account_id)?;
+                if has_login_tokens(&snap) {
+                    return sync_cli_auth_from_snapshot(&snap);
+                }
+            }
+        }
+    }
+
+    let db = state_db(cfg, env_id)?;
+    let snap = read_auth_keys(&db)?;
+    if has_login_tokens(&snap) {
+        sync_cli_auth_from_snapshot(&snap)
+    } else {
+        clear_cli_auth()
+    }
 }
 
 /// Switch auth in the environment DB. Caller must ensure Cursor is not running.
@@ -264,9 +293,11 @@ fn apply_account(cfg: &mut AppConfig, env_id: &str, account_id: &str) -> Result<
     let db = state_db(cfg, env_id)?;
     if account.pending_login {
         clear_auth_keys(&db)?;
+        clear_cli_auth()?;
     } else {
         let snap = load_snapshot(env_id, account_id)?;
         write_auth_keys(&db, &snap)?;
+        sync_cli_auth_from_snapshot(&snap)?;
     }
 
     cfg.active.env_id = Some(env_id.to_string());
@@ -568,6 +599,7 @@ pub fn create_account(env_id: String) -> Result<AppState, String> {
 
     let id = new_id();
     clear_auth_keys(&state_db(&cfg, &env_id)?)?;
+    clear_cli_auth()?;
     save_snapshot(&env_id, &id, &AuthSnapshot::default())?;
 
     cfg.accounts.push(Account {
@@ -618,8 +650,10 @@ pub fn delete_account(id: String) -> Result<AppState, String> {
         if let Some(next_id) = cfg.active.account_id.clone() {
             let snap = load_snapshot(&account.env_id, &next_id)?;
             write_auth_keys(&state_db(&cfg, &account.env_id)?, &snap)?;
+            sync_cli_auth_from_snapshot(&snap)?;
         } else {
             clear_auth_keys(&state_db(&cfg, &account.env_id)?)?;
+            clear_cli_auth()?;
         }
     }
 

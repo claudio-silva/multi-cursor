@@ -976,6 +976,9 @@ window.addEventListener("DOMContentLoaded", () => {
         render();
         return;
       }
+      // quitCursorWithUi leaves busy=true; clear so withBusy can run Launching…
+      busy = false;
+      busyLabel = null;
     } else {
       const ok = await askConfirm(
         "Add account?",
@@ -1042,39 +1045,27 @@ window.addEventListener("DOMContentLoaded", () => {
 
   void refresh({ syncSelection: true }).catch(() => undefined);
 
+  // Keep in sync with CLI (and other Multi Cursor instances): reload config
+  // periodically. Also covers pending-login capture and Cursor running state.
   window.setInterval(() => {
     if (busy) return;
-    // Poll while waiting for sign-in, or while an account is still labeled
-    // "Signing in…" (covers the stuck case where tokens arrived before email).
     const waitingSignIn = accountsForEnv(selectedEnvId).some(
       (a) => a.pendingLogin || a.name.startsWith("Signing in"),
     );
-    if (waitingSignIn) {
-      void refresh({ silent: true })
-        .then(() => {
-          const stillWaiting = accountsForEnv(selectedEnvId).some(
-            (a) => a.pendingLogin || a.name.startsWith("Signing in"),
-          );
-          if (!stillWaiting) {
-            const email =
-              state?.config.accounts.find(
-                (a) => a.id === state?.config.active.accountId,
-              )?.email ??
-              accountsForEnv(selectedEnvId).find((a) => a.email)?.email ??
-              null;
-            if (email) showSuccess(`Signed in as ${email}.`);
-            render();
-          }
-        })
-        .catch(() => undefined);
-      return;
-    }
-    void invoke<boolean>("is_cursor_running")
-      .then((running) => {
-        if (!state) return;
-        if (state.cursorRunning !== running) {
-          state.cursorRunning = running;
-          render();
+    void refresh({ silent: true })
+      .then(() => {
+        if (!waitingSignIn) return;
+        const stillWaiting = accountsForEnv(selectedEnvId).some(
+          (a) => a.pendingLogin || a.name.startsWith("Signing in"),
+        );
+        if (!stillWaiting) {
+          const email =
+            state?.config.accounts.find(
+              (a) => a.id === state?.config.active.accountId,
+            )?.email ??
+            accountsForEnv(selectedEnvId).find((a) => a.email)?.email ??
+            null;
+          if (email) showSuccess(`Signed in as ${email}.`);
         }
       })
       .catch(() => undefined);

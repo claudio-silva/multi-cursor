@@ -10,9 +10,10 @@ cd "$ROOT"
 
 DEST_DIR="${HOME}/Applications"
 APP_NAME="Multi Cursor.app"
-SRC="${ROOT}/src-tauri/target/release/bundle/macos/${APP_NAME}"
+# Workspace Cargo puts release artifacts under the repo-root target/.
+SRC="${ROOT}/target/release/bundle/macos/${APP_NAME}"
 DEST="${DEST_DIR}/${APP_NAME}"
-TARGET_DIR="${ROOT}/src-tauri/target"
+TARGET_DIR="${ROOT}/target"
 BUNDLE_ID="local.multi-cursor.launcher"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 DO_BUILD=0
@@ -147,4 +148,4 @@ hide_undesired_apps
 
 echo "Installed to ${DEST}"
 echo "Open with: open \"${DEST}\""
-echo "Note: the build .app under src-tauri/target was removed after install so Spotlight only sees ~/Applications. Run tauri build again if you need a fresh bundle."
+echo "Note: the build .app under target/ was removed after install so Spotlight only sees ~/Applications. Run tauri build again if you need a fresh bundle."

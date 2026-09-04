@@ -1,0 +1,17 @@
+[package]
+name = "multi-cursor-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLI for switching Cursor Agent accounts"
+publish = false
+
+[[bin]]
+name = "multi-cursor-cli"
+path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+multi-cursor-core = { workspace = true }
